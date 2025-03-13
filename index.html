@@ -66,6 +66,8 @@
             padding: 15px;
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            min-height: 300px; /* Set minimum height */
+            width: 100%; /* Ensure full width */
         }
 
         .cell {
@@ -367,32 +369,51 @@
         let score = 0;
         let hintsUsed = 0;
 
-        // DOM elements
-        const gridEl = document.getElementById('grid');
-        const wordListEl = document.getElementById('word-list');
-        const timeEl = document.getElementById('time');
-        const scoreEl = document.getElementById('score');
-        const hintBtn = document.getElementById('hint-btn');
-        const hintText = document.getElementById('hint-text');
-        const newGameBtn = document.getElementById('new-game-btn');
-        const leaderboardBtn = document.getElementById('leaderboard-btn');
-        const initialsModal = document.getElementById('initials-modal');
-        const leaderboardModal = document.getElementById('leaderboard-modal');
-        const gameOverModal = document.getElementById('game-over-modal');
-        const finalScoreEl = document.getElementById('final-score');
-        const gameOverScoreEl = document.getElementById('game-over-score');
-        const foundWordsEl = document.getElementById('found-words');
-        const totalWordsEl = document.getElementById('total-words');
-        const initialsInput = document.getElementById('initials-input');
-        const saveScoreBtn = document.getElementById('save-score-btn');
-        const leaderboardListEl = document.getElementById('leaderboard-list');
-        const closeLeaderboardBtn = document.getElementById('close-leaderboard-btn');
-        const playAgainBtn = document.getElementById('play-again-btn');
-        const shareTwitterBtn = document.getElementById('share-twitter');
-        const shareFacebookBtn = document.getElementById('share-facebook');
+        // DOM elements - Get references after window loads
+        let gridEl, wordListEl, timeEl, scoreEl, hintBtn, hintText, 
+            newGameBtn, leaderboardBtn, initialsModal, leaderboardModal, 
+            gameOverModal, finalScoreEl, gameOverScoreEl, foundWordsEl, 
+            totalWordsEl, initialsInput, saveScoreBtn, leaderboardListEl, 
+            closeLeaderboardBtn, playAgainBtn, shareTwitterBtn, shareFacebookBtn;
+            
+        function initDOMElements() {
+            gridEl = document.getElementById('grid');
+            wordListEl = document.getElementById('word-list');
+            timeEl = document.getElementById('time');
+            scoreEl = document.getElementById('score');
+            hintBtn = document.getElementById('hint-btn');
+            hintText = document.getElementById('hint-text');
+            newGameBtn = document.getElementById('new-game-btn');
+            leaderboardBtn = document.getElementById('leaderboard-btn');
+            initialsModal = document.getElementById('initials-modal');
+            leaderboardModal = document.getElementById('leaderboard-modal');
+            gameOverModal = document.getElementById('game-over-modal');
+            finalScoreEl = document.getElementById('final-score');
+            gameOverScoreEl = document.getElementById('game-over-score');
+            foundWordsEl = document.getElementById('found-words');
+            totalWordsEl = document.getElementById('total-words');
+            initialsInput = document.getElementById('initials-input');
+            saveScoreBtn = document.getElementById('save-score-btn');
+            leaderboardListEl = document.getElementById('leaderboard-list');
+            closeLeaderboardBtn = document.getElementById('close-leaderboard-btn');
+            playAgainBtn = document.getElementById('play-again-btn');
+            shareTwitterBtn = document.getElementById('share-twitter');
+            shareFacebookBtn = document.getElementById('share-facebook');
+            
+            console.log("DOM elements initialized", gridEl);
+            
+            if (!gridEl) {
+                console.error("Grid element not found!");
+            }
+        }
 
         // Initialize the game
         function initGame() {
+            console.log("Initializing game...");
+            
+            // Initialize DOM elements first
+            initDOMElements();
+            
             // Reset game state
             selectedCells = [];
             foundWords = [];
@@ -406,15 +427,22 @@
             
             // Select a random game data
             currentGame = gameData[Math.floor(Math.random() * gameData.length)];
+            console.log("Selected game data:", currentGame);
             
             // Generate grid with words
             const grid = generateGrid(currentGame.words, currentGame.gridSize);
+            
+            // Add console log for debugging
+            console.log("Generated grid:", grid);
             
             // Render grid
             renderGrid(grid);
             
             // Render word list
             renderWordList(currentGame.words);
+            
+            // Attach event listeners
+            attachEventListeners();
             
             // Start timer
             startTimer();
@@ -529,7 +557,19 @@
 
         // Render grid on the page
         function renderGrid(grid) {
+            console.log("Rendering grid...", grid);
             gridEl.innerHTML = '';
+            
+            if (!grid || grid.length === 0) {
+                console.error("Grid is empty or undefined");
+                // Create a placeholder cell if grid is empty
+                const placeholderCell = document.createElement('div');
+                placeholderCell.className = 'cell';
+                placeholderCell.textContent = 'X';
+                placeholderCell.style.backgroundColor = '#f8f8f8';
+                gridEl.appendChild(placeholderCell);
+                return;
+            }
             
             for (let i = 0; i < grid.length; i++) {
                 for (let j = 0; j < grid[i].length; j++) {
@@ -545,6 +585,8 @@
                     gridEl.appendChild(cell);
                 }
             }
+            
+            console.log("Grid rendered with " + (grid.length * grid[0].length) + " cells");
         }
 
         // Render word list on the page
@@ -767,23 +809,62 @@
             window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank');
         }
 
-        // Event listeners
-        hintBtn.addEventListener('click', getHint);
-        newGameBtn.addEventListener('click', initGame);
-        leaderboardBtn.addEventListener('click', showLeaderboard);
-        saveScoreBtn.addEventListener('click', saveScore);
-        closeLeaderboardBtn.addEventListener('click', () => {
-            leaderboardModal.style.display = 'none';
-        });
-        playAgainBtn.addEventListener('click', () => {
-            gameOverModal.style.display = 'none';
-            initGame();
-        });
-        shareTwitterBtn.addEventListener('click', shareOnTwitter);
-        shareFacebookBtn.addEventListener('click', shareOnFacebook);
+        // Attach event listeners
+        function attachEventListeners() {
+            console.log("Attaching event listeners...");
+            
+            // Remove existing listeners first (to prevent duplicates)
+            hintBtn.removeEventListener('click', getHint);
+            newGameBtn.removeEventListener('click', initGame);
+            leaderboardBtn.removeEventListener('click', showLeaderboard);
+            saveScoreBtn.removeEventListener('click', saveScore);
+            
+            // Add new listeners
+            hintBtn.addEventListener('click', getHint);
+            newGameBtn.addEventListener('click', initGame);
+            leaderboardBtn.addEventListener('click', showLeaderboard);
+            saveScoreBtn.addEventListener('click', saveScore);
+            closeLeaderboardBtn.addEventListener('click', () => {
+                leaderboardModal.style.display = 'none';
+            });
+            playAgainBtn.addEventListener('click', () => {
+                gameOverModal.style.display = 'none';
+                initGame();
+            });
+            shareTwitterBtn.addEventListener('click', shareOnTwitter);
+            shareFacebookBtn.addEventListener('click', shareOnFacebook);
+            
+            console.log("Event listeners attached");
+        }
 
         // Initialize the game on page load
-        document.addEventListener('DOMContentLoaded', initGame);
+        window.onload = function() {
+            console.log("Window loaded, initializing game...");
+            
+            // Short timeout to ensure DOM is fully ready
+            setTimeout(() => {
+                try {
+                    initGame();
+                    console.log("Game initialized successfully");
+                } catch (error) {
+                    console.error("Error initializing game:", error);
+                    
+                    // Emergency fallback - create a basic grid if initialization fails
+                    if (document.getElementById('grid')) {
+                        const gridContainer = document.getElementById('grid');
+                        gridContainer.innerHTML = '';
+                        
+                        // Create a simple 7x7 grid as fallback
+                        for (let i = 0; i < 49; i++) {
+                            const cell = document.createElement('div');
+                            cell.className = 'cell';
+                            cell.textContent = String.fromCharCode(65 + Math.floor(Math.random() * 26));
+                            gridContainer.appendChild(cell);
+                        }
+                    }
+                }
+            }, 100);
+        };
     </script>
 </body>
 </html>
