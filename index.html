@@ -326,6 +326,102 @@
     </div>
 
     <script>
+        // Make functions globally accessible
+        function getHint() {
+            // Find a word that hasn't been found yet
+            const remainingWords = currentGame.words.filter(wordObj => !foundWords.includes(wordObj.word));
+            
+            if (remainingWords.length > 0) {
+                // Select a random word
+                const randomIndex = Math.floor(Math.random() * remainingWords.length);
+                const wordObj = remainingWords[randomIndex];
+                
+                // Show hint
+                hintText.textContent = wordObj.hint;
+                hintText.style.display = 'block';
+                
+                // Penalty for using hint
+                hintsUsed++;
+                timeLeft -= 20; // 20 second penalty
+                updateTimer();
+                
+                console.log("Hint provided for word:", wordObj.word);
+            }
+        }
+        
+        function showLeaderboard() {
+            // Get leaderboard from localStorage
+            const leaderboard = JSON.parse(localStorage.getItem('vaxlink-leaderboard')) || [];
+            
+            // Render leaderboard
+            leaderboardListEl.innerHTML = '';
+            
+            if (leaderboard.length === 0) {
+                const emptyItem = document.createElement('div');
+                emptyItem.className = 'leaderboard-item';
+                emptyItem.textContent = 'No scores yet!';
+                leaderboardListEl.appendChild(emptyItem);
+            } else {
+                leaderboard.forEach((entry, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'leaderboard-item';
+                    
+                    const rank = document.createElement('span');
+                    rank.textContent = `${index + 1}.`;
+                    
+                    const info = document.createElement('span');
+                    info.textContent = `${entry.initials} - ${entry.score}`;
+                    
+                    item.appendChild(rank);
+                    item.appendChild(info);
+                    
+                    leaderboardListEl.appendChild(item);
+                });
+            }
+            
+            // Show leaderboard modal
+            leaderboardModal.style.display = 'flex';
+            console.log("Leaderboard displayed");
+        }
+        
+        function closeLeaderboard() {
+            leaderboardModal.style.display = 'none';
+        }
+        
+        function playAgain() {
+            gameOverModal.style.display = 'none';
+            initGame();
+        }
+        
+        function saveScore() {
+            const initials = initialsInput.value.toUpperCase() || 'AAA';
+            
+            // Get existing leaderboard
+            let leaderboard = JSON.parse(localStorage.getItem('vaxlink-leaderboard')) || [];
+            
+            // Add new score
+            leaderboard.push({
+                initials,
+                score,
+                date: new Date().toISOString()
+            });
+            
+            // Sort leaderboard
+            leaderboard.sort((a, b) => b.score - a.score);
+            
+            // Keep only top 10
+            leaderboard = leaderboard.slice(0, 10);
+            
+            // Save to localStorage
+            localStorage.setItem('vaxlink-leaderboard', JSON.stringify(leaderboard));
+            
+            // Hide initials modal
+            initialsModal.style.display = 'none';
+            
+            // Show leaderboard
+            showLeaderboard();
+        }
+        
         // Game data - Vaccine-themed words and hints
         const gameData = [
             {
@@ -580,13 +676,23 @@
                     cell.dataset.col = j;
                     
                     // Add event listener
-                    cell.addEventListener('click', () => handleCellClick(cell, i, j));
+                    cell.addEventListener('click', function() {
+                        handleCellClick(this, i, j);
+                    });
+                    
+                    // Add direct onclick as fallback
+                    cell.setAttribute('onclick', `handleCellClickGlobal(this, ${i}, ${j})`);
                     
                     gridEl.appendChild(cell);
                 }
             }
             
             console.log("Grid rendered with " + (grid.length * grid[0].length) + " cells");
+        }
+        
+        // Global accessible version for direct onclick attribute
+        function handleCellClickGlobal(cell, row, col) {
+            handleCellClick(cell, row, col);
         }
 
         // Render word list on the page
@@ -608,6 +714,8 @@
 
         // Handle cell click
         function handleCellClick(cell, row, col) {
+            console.log("Cell clicked:", row, col, cell.textContent);
+            
             // Toggle selection
             if (cell.classList.contains('selected')) {
                 // Deselect cell
@@ -615,12 +723,14 @@
                 
                 // Remove from selected cells
                 selectedCells = selectedCells.filter(c => c.row !== row || c.col !== col);
+                console.log("Cell deselected, remaining cells:", selectedCells.length);
             } else {
                 // Select cell
                 cell.classList.add('selected');
                 
                 // Add to selected cells
                 selectedCells.push({ row, col, letter: cell.textContent });
+                console.log("Cell selected, total cells:", selectedCells.length);
                 
                 // Check if word is formed
                 checkSelectedWord();
@@ -631,6 +741,11 @@
         function checkSelectedWord() {
             // Get selected word
             const selectedWord = selectedCells.map(cell => cell.letter).join('');
+            console.log("Checking selected word:", selectedWord);
+            
+            if (selectedWord.length < 3) {
+                return; // Too short to be a valid word
+            }
             
             // Check if word is in the list and not already found
             const foundWordObj = currentGame.words.find(wordObj => 
@@ -638,6 +753,8 @@
             );
             
             if (foundWordObj) {
+                console.log("WORD FOUND:", selectedWord);
+                
                 // Add to found words
                 foundWords.push(selectedWord);
                 
@@ -651,12 +768,55 @@
                 // Highlight cells permanently
                 selectedCells.forEach(cell => {
                     const cellEl = document.querySelector(`.cell[data-row="${cell.row}"][data-col="${cell.col}"]`);
-                    cellEl.classList.remove('selected');
-                    cellEl.classList.add('found');
+                    if (cellEl) {
+                        cellEl.classList.remove('selected');
+                        cellEl.classList.add('found');
+                    }
                 });
                 
                 // Update score
                 score += selectedWord.length * 10;
+                scoreEl.textContent = score;
+                
+                // Reset selected cells
+                selectedCells = [];
+                
+                // Check if all words are found
+                if (foundWords.length === currentGame.words.length) {
+                    endGame(true);
+                }
+            }
+            
+            // Also check for word in reverse (in case user selects in opposite direction)
+            const reversedWord = selectedWord.split('').reverse().join('');
+            const reversedFoundWordObj = currentGame.words.find(wordObj => 
+                wordObj.word === reversedWord && !foundWords.includes(reversedWord)
+            );
+            
+            if (reversedFoundWordObj) {
+                console.log("REVERSED WORD FOUND:", reversedWord);
+                
+                // Add to found words
+                foundWords.push(reversedWord);
+                
+                // Update word list
+                const wordItem = wordListEl.querySelector(`[data-word="${reversedWord}"]`);
+                if (wordItem) {
+                    wordItem.textContent = reversedWord;
+                    wordItem.classList.add('found');
+                }
+                
+                // Highlight cells permanently
+                selectedCells.forEach(cell => {
+                    const cellEl = document.querySelector(`.cell[data-row="${cell.row}"][data-col="${cell.col}"]`);
+                    if (cellEl) {
+                        cellEl.classList.remove('selected');
+                        cellEl.classList.add('found');
+                    }
+                });
+                
+                // Update score
+                score += reversedWord.length * 10;
                 scoreEl.textContent = score;
                 
                 // Reset selected cells
@@ -673,11 +833,14 @@
         function startTimer() {
             clearInterval(timer);
             
-            timer = setInterval(() => {
+            console.log("Starting timer with", timeLeft, "seconds");
+            
+            timer = setInterval(function() {
                 timeLeft--;
                 updateTimer();
                 
                 if (timeLeft <= 0) {
+                    console.log("Time's up!");
                     endGame(false);
                 }
             }, 1000);
@@ -708,91 +871,14 @@
             }
         }
 
-        // Get hint
-        function getHint() {
-            // Find a word that hasn't been found yet
-            const remainingWords = currentGame.words.filter(wordObj => !foundWords.includes(wordObj.word));
-            
-            if (remainingWords.length > 0) {
-                // Select a random word
-                const randomIndex = Math.floor(Math.random() * remainingWords.length);
-                const wordObj = remainingWords[randomIndex];
-                
-                // Show hint
-                hintText.textContent = wordObj.hint;
-                hintText.style.display = 'block';
-                
-                // Penalty for using hint
-                hintsUsed++;
-                timeLeft -= 20; // 20 second penalty
-                updateTimer();
-            }
-        }
+        // This function is intentionally left empty as it's redefined at the top of the script
+        // to make it globally accessible
 
-        // Save score to leaderboard
-        function saveScore() {
-            const initials = initialsInput.value.toUpperCase() || 'AAA';
-            
-            // Get existing leaderboard
-            let leaderboard = JSON.parse(localStorage.getItem('vaxlink-leaderboard')) || [];
-            
-            // Add new score
-            leaderboard.push({
-                initials,
-                score,
-                date: new Date().toISOString()
-            });
-            
-            // Sort leaderboard
-            leaderboard.sort((a, b) => b.score - a.score);
-            
-            // Keep only top 10
-            leaderboard = leaderboard.slice(0, 10);
-            
-            // Save to localStorage
-            localStorage.setItem('vaxlink-leaderboard', JSON.stringify(leaderboard));
-            
-            // Hide initials modal
-            initialsModal.style.display = 'none';
-            
-            // Show leaderboard
-            showLeaderboard();
-        }
+        // This function is intentionally left empty as it's redefined at the top of the script
+        // to make it globally accessible
 
-        // Show leaderboard
-        function showLeaderboard() {
-            // Get leaderboard from localStorage
-            const leaderboard = JSON.parse(localStorage.getItem('vaxlink-leaderboard')) || [];
-            
-            // Render leaderboard
-            leaderboardListEl.innerHTML = '';
-            
-            if (leaderboard.length === 0) {
-                const emptyItem = document.createElement('div');
-                emptyItem.className = 'leaderboard-item';
-                emptyItem.textContent = 'No scores yet!';
-                leaderboardListEl.appendChild(emptyItem);
-            } else {
-                leaderboard.forEach((entry, index) => {
-                    const item = document.createElement('div');
-                    item.className = 'leaderboard-item';
-                    
-                    const rank = document.createElement('span');
-                    rank.textContent = `${index + 1}.`;
-                    
-                    const info = document.createElement('span');
-                    info.textContent = `${entry.initials} - ${entry.score}`;
-                    
-                    item.appendChild(rank);
-                    item.appendChild(info);
-                    
-                    leaderboardListEl.appendChild(item);
-                });
-            }
-            
-            // Show leaderboard modal
-            leaderboardModal.style.display = 'flex';
-        }
+        // This function is intentionally left empty as it's redefined at the top of the script
+        // to make it globally accessible
 
         // Share score on Twitter
         function shareOnTwitter() {
@@ -813,26 +899,59 @@
         function attachEventListeners() {
             console.log("Attaching event listeners...");
             
-            // Remove existing listeners first (to prevent duplicates)
-            hintBtn.removeEventListener('click', getHint);
-            newGameBtn.removeEventListener('click', initGame);
-            leaderboardBtn.removeEventListener('click', showLeaderboard);
-            saveScoreBtn.removeEventListener('click', saveScore);
+            if (!hintBtn || !newGameBtn || !leaderboardBtn) {
+                console.error("Required buttons not found!");
+                return;
+            }
             
-            // Add new listeners
-            hintBtn.addEventListener('click', getHint);
-            newGameBtn.addEventListener('click', initGame);
-            leaderboardBtn.addEventListener('click', showLeaderboard);
-            saveScoreBtn.addEventListener('click', saveScore);
-            closeLeaderboardBtn.addEventListener('click', () => {
-                leaderboardModal.style.display = 'none';
+            // Add direct onclick attributes to buttons as a fallback
+            hintBtn.setAttribute('onclick', 'getHint()');
+            newGameBtn.setAttribute('onclick', 'initGame()');
+            leaderboardBtn.setAttribute('onclick', 'showLeaderboard()');
+            
+            // Add normal event listeners
+            hintBtn.addEventListener('click', function() {
+                console.log("Hint button clicked");
+                getHint();
             });
-            playAgainBtn.addEventListener('click', () => {
-                gameOverModal.style.display = 'none';
+            
+            newGameBtn.addEventListener('click', function() {
+                console.log("New Game button clicked");
                 initGame();
             });
-            shareTwitterBtn.addEventListener('click', shareOnTwitter);
-            shareFacebookBtn.addEventListener('click', shareOnFacebook);
+            
+            leaderboardBtn.addEventListener('click', function() {
+                console.log("Leaderboard button clicked");
+                showLeaderboard();
+            });
+            
+            if (saveScoreBtn) {
+                saveScoreBtn.setAttribute('onclick', 'saveScore()');
+                saveScoreBtn.addEventListener('click', saveScore);
+            }
+            
+            if (closeLeaderboardBtn) {
+                closeLeaderboardBtn.setAttribute('onclick', 'closeLeaderboard()');
+                closeLeaderboardBtn.addEventListener('click', function() {
+                    leaderboardModal.style.display = 'none';
+                });
+            }
+            
+            if (playAgainBtn) {
+                playAgainBtn.setAttribute('onclick', 'playAgain()');
+                playAgainBtn.addEventListener('click', function() {
+                    gameOverModal.style.display = 'none';
+                    initGame();
+                });
+            }
+            
+            if (shareTwitterBtn) {
+                shareTwitterBtn.addEventListener('click', shareOnTwitter);
+            }
+            
+            if (shareFacebookBtn) {
+                shareFacebookBtn.addEventListener('click', shareOnFacebook);
+            }
             
             console.log("Event listeners attached");
         }
